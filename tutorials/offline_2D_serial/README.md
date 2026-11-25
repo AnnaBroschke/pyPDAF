@@ -28,6 +28,19 @@ python verification/check_offline.py offline_2D_serial offline_2D_serial_ESTKF  
 
 The reference files are copied from `PDAF/tutorial/verification`.
 
+## Plotting
+
+The scripts in `../plotting` are taken from `PDAF/tutorial/plotting`:
+
+```bash
+python ../plotting/plot_file.py state_ana.txt                          # analysis field
+python ../plotting/plot_obs.py ../inputs_offline/obs.txt              # observations
+python ../plotting/plot_diff.py state_ana.txt ../inputs_offline/true.txt   # analysis - truth (+ RMSE)
+```
+
+Without a display (e.g. on an Albedo login node without `ssh -X`) the figure is
+saved as PNG instead; use `--save FILE.png` to choose the file name.
+
 ## Main differences to Fortran
 
 | Fortran | Python |

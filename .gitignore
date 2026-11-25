@@ -138,3 +138,5 @@ docs/build/
 docs/source/_autosummary
 *.txt
 .vscode/
+# Tutorial input and reference files (exceptions to *.txt above)
+!tutorials/inputs_*/*.txt

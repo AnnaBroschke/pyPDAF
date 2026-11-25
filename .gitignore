@@ -140,3 +140,4 @@ docs/source/_autosummary
 .vscode/
 # Tutorial input and reference files (exceptions to *.txt above)
 !tutorials/inputs_*/*.txt
+!tutorials/verification/**/*.txt

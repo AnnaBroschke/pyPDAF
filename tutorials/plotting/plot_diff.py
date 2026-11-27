@@ -1,43 +1,41 @@
 #!/usr/bin/env python3
+"""Plot the difference of two 2D fields and print the RMSE.
 
-# A script to plot the 2D field from the online_2D_serialmodel tutorial.
-# Requires Python 3, Matplotlib and Numpy.
+Typical use: analysis minus truth. Based on PDAF/tutorial/plotting/plot_diff.py.
+Requires Matplotlib and NumPy.
 
-# Usage: ./plot_field.py <filename1> <filename2>
+Usage: ./plot_diff.py <filename1> <filename2> [--save FILE.png]
+"""
+import argparse as ap
+import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-import argparse as ap
 
-import os
+from plot_utils import (CMAP_DIFF, describe, read_field, show_field,
+                        show_or_save, sym_limit)
 
-def show_or_save(save, default_name):
-    """Show the figure, or save it as PNG if --save is given or no display is available."""
-    if save is None and not os.environ.get('DISPLAY'):
-        save = default_name
-    if save:
-        plt.savefig(save, dpi=150, bbox_inches='tight')
-        print('Figure saved to', save)
-    else:
-        plt.show()
 
 def read_and_plot(filename1, filename2, save=None):
-    field1 = np.loadtxt(filename1)
-    field2 = np.loadtxt(filename2)
-    field1 = field1.reshape(18,36)
-    field2 = field2.reshape(18,36)
-    rmse = 0;
-    for i in range(18):
-       for j in range(36):
-	       rmse = rmse + (field1[i,j]-field2[i,j])**2
-    rmse = np.sqrt(1/(18*36)*(rmse));
+    field1 = read_field(filename1)
+    field2 = read_field(filename2)
+    diff = field1 - field2
+
+    # Root mean square difference over all grid points
+    rmse = np.sqrt(np.mean(diff**2))
     print('RMSE: ', rmse)
-    plt.imshow(field1-field2, origin='lower',interpolation='none',cmap='PiYG')
-    plt.colorbar()
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    img = show_field(ax, diff, CMAP_DIFF, sym_limit(diff))
+    ax.set_title(f'{describe(filename1)} minus {describe(filename2).lower()}\n'
+                 f'{os.path.basename(filename1)} - {os.path.basename(filename2)}'
+                 f'   (RMSE = {rmse:.4f})', fontsize=11)
+    fig.colorbar(img, ax=ax, label='Difference', shrink=0.85)
     show_or_save(save, 'diff.png')
 
+
 if __name__ == "__main__":
-    parser = ap.ArgumentParser()
+    parser = ap.ArgumentParser(description='Plot the difference of two 2D fields.')
     parser.add_argument('filename1')
     parser.add_argument('filename2')
     parser.add_argument('--save', metavar='FILE', default=None,

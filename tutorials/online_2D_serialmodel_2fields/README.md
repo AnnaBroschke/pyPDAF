@@ -46,10 +46,8 @@ python verification/check_online.py online_2D_serialmodel_2fields online_2D_seri
 ```bash
 python ../plotting/plot_file.py stateB_step18_ana.txt
 python ../plotting/plot_diff.py stateB_step18_ana.txt ../inputs_online_2fields/trueB_step18.txt
+python ../plotting/plot_ens.py 5 20 --prefix ensB      # time series of field B
 ```
-
-`plot_ens.py` expects files named `ens_XX_step...` and therefore works only
-for the single-field tutorial.
 
 ## Differences to Fortran (in addition to online_2D_serialmodel)
 

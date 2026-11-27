@@ -1,72 +1,92 @@
 #!/usr/bin/env python3
+"""Plot a time series of ensemble mean and spread at one grid point.
 
-# A script to plot a time series of the ensemble mean and spread
-# for a single point from the online_2D_serialmodel tutorial.
-# Requires Python 3, Matplotlib and Numpy.
+For the online tutorials. Reads ``<prefix>_XX_stepYY_for.txt`` and
+``<prefix>_XX_stepYY_ana.txt`` from the current directory. The analysis
+steps are taken from the files, so any value of delt_obs works.
+Based on PDAF/tutorial/plotting/plot_ens.py. Requires Matplotlib and NumPy.
 
-# Usage: ./plot_ens.py <i> <j>
-
+Usage: ./plot_ens.py <i> <j> [--prefix ensB] [--save FILE.png]
+       i, j: row and column index of the field (0-based, as in the original
+       script). This is grid point x = j+1, y = i+1.
+"""
+import argparse as ap
+import glob
+import re
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-import argparse as ap
 
-import os
+from plot_utils import read_field, show_or_save
 
-def show_or_save(save, default_name):
-    """Show the figure, or save it as PNG if --save is given or no display is available."""
-    if save is None and not os.environ.get('DISPLAY'):
-        save = default_name
-    if save:
-        plt.savefig(save, dpi=150, bbox_inches='tight')
-        print('Figure saved to', save)
-    else:
-        plt.show()
-import glob
-import sys
 
-def read_ensemble():
-    files = glob.glob("ens_01*.txt")
-    ntime = len(files)
-    files = glob.glob("ens_*step02_for.txt")
-    nens = len(files)
+def read_ensemble(prefix, i, j):
+    """Return analysis steps and the ensemble values at (i, j).
 
-    try:
-        if nens*ntime == 0:
-            raise Exception("No ens*.txt files found.")
-    except:
-        raise
+    Returns
+    -------
+    steps : (nsteps,) int
+    ens : (nsteps, 2, nens) values at the point; [:, 0] forecast, [:, 1] analysis
+    """
+    files = glob.glob(f'{prefix}_01_step*_for.txt')
+    steps = sorted(int(re.search(r'_step(\d+)_for', f).group(1)) for f in files)
+    nens = len(glob.glob(f'{prefix}_*_step{steps[0]:02d}_for.txt')) if steps else 0
+    if not steps or nens == 0:
+        raise FileNotFoundError(f'No files {prefix}_XX_stepYY_for.txt found.')
 
-    ens = np.empty((ntime, 18, 36, nens))
-    for i in range(int(ntime/2)):
-        for j in range(nens):
-            field = np.loadtxt("ens_{0:02d}_step{1:02d}_for.txt".format(j+1, 2*(i+1)))
-            ens[2*i, ..., j] = np.loadtxt("ens_{0:02d}_step{1:02d}_for.txt".format(j+1, 2*(i+1)))
-            ens[2*i+1, ..., j] = np.loadtxt("ens_{0:02d}_step{1:02d}_ana.txt".format(j+1, 2*(i+1)))
-    return ens
+    ens = np.empty((len(steps), 2, nens))
+    for k, step in enumerate(steps):
+        for m in range(nens):
+            for p, phase in enumerate(('for', 'ana')):
+                ens[k, p, m] = read_field(
+                    f'{prefix}_{m + 1:02d}_step{step:02d}_{phase}.txt')[i, j]
+    return np.array(steps), ens
 
-def plot(ens, i, j, save=None):
-    time = np.array([])
-    for k in range(int(ens.shape[0]/2)):
-        time = np.hstack((time, [k, k]))
-    plt.fill_between(time, ens[:, i, j].mean(axis=-1)-ens[:, i, j].std(axis=-1), ens[:, i, j].mean(axis=-1)+ens[:, i, j].std(axis=-1), color=[0.7,0.7,0.7])
-    plt.plot(time, ens[:, i, j].mean(axis=-1))
-    plt.title('Ensemble at '+str(i)+ ', '+str(j))
-    plt.gca().set_xticklabels(["{0:.0f}".format(i+2) for i in 2*plt.gca().get_xticks()])
-    show_or_save(save, f'ens_{i}_{j}.png')
+
+def plot(steps, ens, i, j, prefix, save=None):
+    # Forecast and analysis at the same time step -> two points per step
+    time = np.repeat(steps, 2)
+    values = ens.reshape(-1, ens.shape[-1])
+    mean = values.mean(axis=-1)
+    std = values.std(axis=-1)
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.fill_between(time, mean - std, mean + std, color='C0', alpha=0.2,
+                    linewidth=0, label='Ensemble mean ± 1 std. dev.')
+    ax.plot(time, mean, color='C0', linewidth=2, label='Ensemble mean')
+    ax.plot(steps, ens[:, 0].mean(axis=-1), 'o', color='C0', markersize=7,
+            markerfacecolor='white', label='Forecast')
+    ax.plot(steps, ens[:, 1].mean(axis=-1), 'o', color='C0', markersize=7,
+            label='Analysis')
+
+    field = prefix[3:]
+    ax.set_title(f'Ensemble at grid point x={j + 1}, y={i + 1} (i={i}, j={j})'
+                 + (f', field {field}' if field else '')
+                 + f'\n{ens.shape[-1]} members', fontsize=11)
+    ax.set_xlabel('Time step')
+    ax.set_ylabel('Field value')
+    ax.set_xticks(steps)
+    ax.grid(True, color='#dddddd', linewidth=0.8)
+    ax.set_axisbelow(True)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=4, frameon=False)
+    show_or_save(save, f'{prefix}_{i}_{j}.png')
+
 
 if __name__ == "__main__":
-    parser = ap.ArgumentParser()
-    parser.add_argument('i', type=int)
-    parser.add_argument('j', type=int)
+    parser = ap.ArgumentParser(description='Plot ensemble mean and spread at one grid point.')
+    parser.add_argument('i', type=int, help='row index (0-based), grid point y = i+1')
+    parser.add_argument('j', type=int, help='column index (0-based), grid point x = j+1')
+    parser.add_argument('--prefix', default='ens',
+                        help='file prefix: ens (default), ensA or ensB (2fields tutorial)')
     parser.add_argument('--save', metavar='FILE', default=None,
                         help='save figure to FILE (PNG) instead of showing it')
     args = parser.parse_args()
     print("Plotting time series for point at i={0:d}, j={1:d}.".format(args.i, args.j))
     try:
-        ens = read_ensemble()
+        steps, ens = read_ensemble(args.prefix, args.i, args.j)
     except Exception as err:
         print(err)
         sys.exit(1)
 
-    plot(ens, args.i, args.j, args.save)
+    plot(steps, ens, args.i, args.j, args.prefix, args.save)

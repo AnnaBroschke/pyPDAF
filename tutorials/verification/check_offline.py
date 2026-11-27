@@ -9,6 +9,7 @@ compares ``offline_2D_serial/*_ana.txt`` with
 ``verification/offline_2D_serial/*_ana.txt`` (copied from PDAF/tutorial/verification).
 """
 import argparse
+import glob
 import os
 
 import numpy as np
@@ -22,15 +23,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
     refdir = os.path.join(os.path.dirname(__file__), args.refname)
 
-    maxdiff, imax = 0.0, 0
-    for i in range(10):
-        fname = 'state_ana.txt' if i == 0 else f'ens_{i:02d}_ana.txt'
+    # All files of the reference directory are compared (10 for the
+    # ensemble methods, 2 for parameterized 3D-Var with dim_ens=1)
+    fnames = sorted(os.path.basename(f) for f in glob.glob(os.path.join(refdir, '*_ana.txt')))
+    maxdiff, worst = 0.0, ''
+    for fname in fnames:
         field = np.loadtxt(os.path.join(args.rundir, fname))
         field_ref = np.loadtxt(os.path.join(refdir, fname))
         mdiff = np.max(np.abs(field - field_ref))
-        if mdiff > maxdiff:
-            maxdiff, imax = mdiff, i
+        if mdiff >= maxdiff:
+            maxdiff, worst = mdiff, fname
 
     status = 'OK' if maxdiff < LIMIT else 'WARNING!'
-    print(f'Check {maxdiff:10.2e}   {args.rundir} vs {args.refname} '
-          f'at member {imax:3d}  {status}')
+    print(f'Check {maxdiff:10.2e}   {args.rundir} vs {args.refname}: '
+          f'{len(fnames)} files, max. in {worst}  {status}')

@@ -20,18 +20,24 @@ if __name__ == '__main__':
     parser.add_argument('rundir')
     parser.add_argument('refname')
     parser.add_argument('--fields', nargs='+', default=['ens', 'state'],
-                        help='file prefixes to compare (default: ens state; '
-                             'use "ens state ensB stateB" for the 2fields tutorial)')
+                        help='file prefixes to compare, either "prefix" or '
+                             '"run_prefix:ref_prefix" (default: ens state). '
+                             'Example for the 2fields tutorial: ensA:ens stateA:state')
     args = parser.parse_args()
     refdir = os.path.join(os.path.dirname(__file__), args.refname)
 
     # The PDAF reference directories may also contain files of the 2fields
     # tutorial (ensB_*, stateB_*), therefore only the given prefixes are used.
-    reffiles = sorted(f for prefix in args.fields
-                      for f in glob.glob(os.path.join(refdir, f'{prefix}_*step*.txt')))
+    pairs = []   # (reference file, file name in run directory)
+    for item in args.fields:
+        run_prefix, _, ref_prefix = item.partition(':')
+        ref_prefix = ref_prefix or run_prefix
+        for ref in sorted(glob.glob(os.path.join(refdir, f'{ref_prefix}_*step*.txt'))):
+            fname = run_prefix + os.path.basename(ref)[len(ref_prefix):]
+            pairs.append((ref, fname))
+    reffiles = [ref for ref, _ in pairs]
     maxdiff, worst, missing = 0.0, '', []
-    for ref in reffiles:
-        fname = os.path.basename(ref)
+    for ref, fname in pairs:
         path = os.path.join(args.rundir, fname)
         if not os.path.exists(path):
             missing.append(fname)
